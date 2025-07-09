@@ -1,18 +1,15 @@
 import { useState } from 'react'
 import axios from 'axios'
-import * as pdfjsLib from 'pdfjs-dist/build/pdf'
-import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry'
+import ResumePreview from './ResumePreview'
 import html2pdf from 'html2pdf.js'
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 const App = () => {
   const [resume, setResume] = useState('')
   const [jd, setJD] = useState('')
-  const [output, setOutput] = useState('')
+  const [jsonData, setJsonData] = useState(null)
   const [loading, setLoading] = useState(false)
 
-  const handleSubmit = async () => {
+  const handleTailor = async () => {
     setLoading(true)
     try {
       const res = await axios.post(
@@ -22,7 +19,47 @@ const App = () => {
           messages: [
             {
               role: 'user',
-              content: `Act as a professional resume writer. Rewrite the resume below to match the job description. Format it using modern HTML resume structure like Jake’s resume — use <section>, <h2>, <ul>, <li>, <strong>, and <p> only. Return just the formatted HTML resume body. No extra comments.\n\nResume:\n${resume}\n\nJob Description:\n${jd}`
+              content: `You are a professional resume writer and ATS optimization expert. Given a resume and job description, tailor the resume content to match the job description as closely as possible to maximize ATS score (80%+). Highlight relevant skills, experience, and projects that align with the job. Do not include irrelevant information.
+
+Output only a JSON object with these fields:
+{
+  "name": "",
+  "contact": {
+    "email": "",
+    "phone": "",
+    "linkedin": "",
+    "github": ""
+  },
+  "summary": "",
+  "skills": [],
+  "experience": [
+    {
+      "title": "",
+      "company": "",
+      "location": "",
+      "startDate": "",
+      "endDate": "",
+      "bullets": []
+    }
+  ],
+  "education": [
+    {
+      "institution": "",
+      "degree": "",
+      "location": "",
+      "startDate": "",
+      "endDate": ""
+    }
+  ],
+  "projects": [
+    {
+      "title": "",
+      "technologies": "",
+      "bullets": []
+    }
+  ]
+}
+Only return valid JSON. No explanation or formatting around it. Tailor each section to fit the job description as much as possible.`
             }
           ],
           temperature: 0.5
@@ -34,62 +71,34 @@ const App = () => {
           }
         }
       )
-      setOutput(res.data.choices[0].message.content)
+
+      const raw = res.data.choices[0].message.content.trim()
+      const parsed = JSON.parse(raw)
+      setJsonData(parsed)
     } catch (err) {
-      console.error(err)
-      setOutput('Something went wrong.')
+      console.error('Failed to parse JSON or fetch:', err)
+      alert('Something went wrong. Check console or try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  const handlePDFUpload = async (file) => {
-    const reader = new FileReader()
-    reader.onload = async function () {
-      const typedarray = new Uint8Array(this.result)
-      const pdf = await pdfjsLib.getDocument(typedarray).promise
-      let text = ''
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i)
-        const content = await page.getTextContent()
-        text += content.items.map((s) => s.str).join(' ') + '\n'
-      }
-      setResume(text)
-    }
-    reader.readAsArrayBuffer(file)
-  }
-
   const downloadPDF = () => {
-    const element = document.getElementById('resume-output')
-    html2pdf().set({
-      margin: 0.5,
-      filename: 'Tailored_Resume.pdf',
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    }).from(element).save()
+    const element = document.getElementById('resume-preview')
+    html2pdf().from(element).save('ATS-Tailored-Resume.pdf')
   }
 
   return (
     <div style={{ padding: 20, maxWidth: 800, margin: '0 auto' }}>
-      <h1>📝 Resume Tailor (Free & Smart)</h1>
+      <h1>🎯 ATS Resume Tailor</h1>
 
-      <h3>1. Upload PDF Resume or Paste Below</h3>
-      <input
-        type="file"
-        accept=".pdf"
-        onChange={(e) => handlePDFUpload(e.target.files[0])}
-        style={{ marginBottom: 10 }}
-      />
       <textarea
-        placeholder="Or paste your resume here"
-        rows={10}
+        placeholder="Paste your resume here"
+        rows={8}
         style={{ width: '100%', marginBottom: 10 }}
         onChange={(e) => setResume(e.target.value)}
-        value={resume}
       />
 
-      <h3>2. Paste Job Description</h3>
       <textarea
         placeholder="Paste job description here"
         rows={8}
@@ -97,50 +106,15 @@ const App = () => {
         onChange={(e) => setJD(e.target.value)}
       />
 
-      <button onClick={handleSubmit} disabled={loading}>
-        {loading ? 'Tailoring...' : 'Tailor My Resume'}
+      <button onClick={handleTailor} disabled={loading}>
+        {loading ? 'Tailoring…' : 'Tailor Resume'}
       </button>
 
-      {output && (
+      {jsonData && (
         <>
-          <h2>🎯 Tailored Resume</h2>
-          <div
-            id="resume-output"
-            style={{
-              padding: '40px',
-              background: '#fff',
-              fontFamily: "'Inter', sans-serif",
-              color: '#222',
-              maxWidth: '800px',
-              margin: '20px auto',
-              boxShadow: '0 0 10px rgba(0,0,0,0.05)'
-            }}
-          >
-            <style>
-              {`
-                #resume-output h1 {
-                  font-size: 26px;
-                  margin-bottom: 5px;
-                }
-                #resume-output h2 {
-                  font-size: 18px;
-                  margin-top: 24px;
-                  border-bottom: 1px solid #ddd;
-                  padding-bottom: 4px;
-                }
-                #resume-output p, li {
-                  font-size: 14px;
-                  line-height: 1.6;
-                }
-                #resume-output ul {
-                  padding-left: 20px;
-                }
-              `}
-            </style>
-            <div dangerouslySetInnerHTML={{ __html: output }} />
-          </div>
-          <button onClick={downloadPDF} style={{ marginTop: '10px' }}>
-            ⬇️ Download as PDF
+          <ResumePreview data={jsonData} />
+          <button onClick={downloadPDF} style={{ marginTop: 12 }}>
+            ⬇️ Download PDF
           </button>
         </>
       )}
