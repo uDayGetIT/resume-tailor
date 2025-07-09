@@ -22,7 +22,7 @@ const App = () => {
           messages: [
             {
               role: 'user',
-              content: `You are an expert resume editor. Tailor the resume below to match the job description. Improve tone, ATS formatting, and clarity.\n\nResume:\n${resume}\n\nJob Description:\n${jd}`
+              content: `Act as a professional resume writer. Rewrite the resume below to match the job description. Format it using modern HTML resume structure like Jake’s resume — use <section>, <h2>, <ul>, <li>, <strong>, and <p> only. Return just the formatted HTML resume body. No extra comments.\n\nResume:\n${resume}\n\nJob Description:\n${jd}`
             }
           ],
           temperature: 0.5
@@ -61,12 +61,18 @@ const App = () => {
 
   const downloadPDF = () => {
     const element = document.getElementById('resume-output')
-    html2pdf().from(element).save('Tailored_Resume.pdf')
+    html2pdf().set({
+      margin: 0.5,
+      filename: 'Tailored_Resume.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2 },
+      jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    }).from(element).save()
   }
 
   return (
     <div style={{ padding: 20, maxWidth: 800, margin: '0 auto' }}>
-      <h1>📝 Free Resume Tailor</h1>
+      <h1>📝 Resume Tailor (Free & Smart)</h1>
 
       <h3>1. Upload PDF Resume or Paste Below</h3>
       <input
@@ -101,14 +107,37 @@ const App = () => {
           <div
             id="resume-output"
             style={{
-              border: '1px solid #ccc',
-              padding: '20px',
-              marginTop: '10px',
-              fontFamily: 'Georgia, serif',
-              backgroundColor: '#fff'
+              padding: '40px',
+              background: '#fff',
+              fontFamily: "'Inter', sans-serif",
+              color: '#222',
+              maxWidth: '800px',
+              margin: '20px auto',
+              boxShadow: '0 0 10px rgba(0,0,0,0.05)'
             }}
           >
-            <pre style={{ whiteSpace: 'pre-wrap' }}>{output}</pre>
+            <style>
+              {`
+                #resume-output h1 {
+                  font-size: 26px;
+                  margin-bottom: 5px;
+                }
+                #resume-output h2 {
+                  font-size: 18px;
+                  margin-top: 24px;
+                  border-bottom: 1px solid #ddd;
+                  padding-bottom: 4px;
+                }
+                #resume-output p, li {
+                  font-size: 14px;
+                  line-height: 1.6;
+                }
+                #resume-output ul {
+                  padding-left: 20px;
+                }
+              `}
+            </style>
+            <div dangerouslySetInnerHTML={{ __html: output }} />
           </div>
           <button onClick={downloadPDF} style={{ marginTop: '10px' }}>
             ⬇️ Download as PDF
