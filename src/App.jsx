@@ -1,13 +1,34 @@
 import { useState } from 'react'
 import axios from 'axios'
-import ResumePreview from './ResumePreview'
 import html2pdf from 'html2pdf.js'
+import ResumePreview from './ResumePreview'
+
+// ✅ PDF extraction
+import * as pdfjsLib from 'pdfjs-dist/build/pdf'
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.entry'
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
 const App = () => {
   const [resume, setResume] = useState('')
   const [jd, setJD] = useState('')
   const [jsonData, setJsonData] = useState(null)
   const [loading, setLoading] = useState(false)
+
+  const handlePDFUpload = async (file) => {
+    const reader = new FileReader()
+    reader.onload = async function () {
+      const typedarray = new Uint8Array(this.result)
+      const pdf = await pdfjsLib.getDocument(typedarray).promise
+      let text = ''
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i)
+        const content = await page.getTextContent()
+        text += content.items.map((s) => s.str).join(' ') + '\n'
+      }
+      setResume(text)
+    }
+    reader.readAsArrayBuffer(file)
+  }
 
   const handleTailor = async () => {
     setLoading(true)
@@ -60,6 +81,10 @@ Output only a JSON object with these fields:
   ]
 }
 Only return valid JSON. No explanation or formatting around it. Tailor each section to fit the job description as much as possible.`
+            },
+            {
+              role: 'user',
+              content: `Resume:\n${resume}\n\nJob Description:\n${jd}`
             }
           ],
           temperature: 0.5
@@ -77,7 +102,7 @@ Only return valid JSON. No explanation or formatting around it. Tailor each sect
       setJsonData(parsed)
     } catch (err) {
       console.error('Failed to parse JSON or fetch:', err)
-      alert('Something went wrong. Check console or try again.')
+      alert('Something went wrong. Check the console or try again.')
     } finally {
       setLoading(false)
     }
@@ -90,12 +115,21 @@ Only return valid JSON. No explanation or formatting around it. Tailor each sect
 
   return (
     <div style={{ padding: 20, maxWidth: 800, margin: '0 auto' }}>
-      <h1>🎯 ATS Resume Tailor</h1>
+      <h1>📄 ATS Resume Tailor</h1>
+
+      <h3>Upload PDF Resume</h3>
+      <input
+        type="file"
+        accept=".pdf"
+        onChange={(e) => handlePDFUpload(e.target.files[0])}
+        style={{ marginBottom: 10 }}
+      />
 
       <textarea
-        placeholder="Paste your resume here"
+        placeholder="Or paste your resume here"
         rows={8}
         style={{ width: '100%', marginBottom: 10 }}
+        value={resume}
         onChange={(e) => setResume(e.target.value)}
       />
 
@@ -103,6 +137,7 @@ Only return valid JSON. No explanation or formatting around it. Tailor each sect
         placeholder="Paste job description here"
         rows={8}
         style={{ width: '100%', marginBottom: 10 }}
+        value={jd}
         onChange={(e) => setJD(e.target.value)}
       />
 
